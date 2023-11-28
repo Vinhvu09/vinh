@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
+const User = require("./user.model");
 
 const tourSchema = new mongoose.Schema(
   {
@@ -78,10 +79,34 @@ const tourSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    startLocation: {
+      //GeoJson
+      type: {
+        type: String,
+        default: "Point",
+        enum: ["Point"],
+      },
+      coordinates: [Number],
+      address: String,
+      description: String,
+    },
+    location: [
+      {
+        type: {
+          type: String,
+          default: "Point",
+          enum: ["Point"],
+        },
+        coordinates: [Number],
+        address: String,
+        description: String,
+        day: Number,
+      },
+    ],
     guides: [
       {
         type: mongoose.Schema.ObjectId,
-        ref: "User",
+        ref: "MyUser",
       },
     ],
   },
@@ -90,6 +115,10 @@ const tourSchema = new mongoose.Schema(
     toObject: { virtuals: true },
   }
 );
+
+tourSchema.index({ price: 1, ratingsAverage: -1 });
+tourSchema.index({ slug: 1 });
+tourSchema.index({ startLocation: "2dsphere" });
 
 tourSchema.virtual("durationWeeks").get(function () {
   return Math.floor(this.duration / 7); // lam tron so
@@ -108,6 +137,21 @@ tourSchema.pre(/^find/, function (next) {
   next();
 });
 
+tourSchema.pre("findOne", function (next) {
+  this.populate({
+    path: "guides",
+    select: "-__v -passwordChangedAt",
+  });
+
+  next();
+});
+
+// tourSchema.pre("save", async function (next) {
+//   const guidesPromise = this.guides.map(async (id) => await User.findById(id));
+//   this.guides = await Promise.all(guidesPromise);
+//   next();
+// });
+
 // tourSchema.pre(/^find/, function (next) {
 //   this.populate({
 //     path: "guides",
@@ -121,6 +165,12 @@ tourSchema.post(/^find/, function (docs, next) {
   console.log(`Query took ${Date.now() - this.start} milliseconds!`);
   next();
 });
+
+// tourSchema.pre("aggregate", function (next) {
+//   this.pipeline().unshift({ $match: { secretTour: { $ne: true } } });
+//   console.log(this.pipeline());
+//   next();
+// });
 
 const Tour = mongoose.model("MyTour", tourSchema);
 
